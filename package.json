@@ -1,0 +1,13 @@
+{
+  "name": "slopus-homebrew-tap-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs",
+    "update": "node scripts/update-happy.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}

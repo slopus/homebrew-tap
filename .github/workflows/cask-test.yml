@@ -1,0 +1,101 @@
+name: Install and boot Happy cask
+
+on:
+  push:
+    branches: [main]
+    paths: [Casks/**, scripts/**, package*.json, .github/workflows/cask-test.yml]
+  pull_request:
+    paths: [Casks/**, scripts/**, package*.json, .github/workflows/cask-test.yml]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      candidate:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  cask:
+    name: Install and boot (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      # This action checks out the workflow SHA into Homebrew's tap directory.
+      # Download the candidate AFTER setup, which replaces the workspace.
+      - uses: Homebrew/actions/setup-homebrew@082c94ee19e776205cfa8e43802917d1425e2fe7
+        with:
+          stable: true
+      - name: Download candidate cask
+        if: inputs.candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: candidate-cask
+          path: Casks
+      - name: Select supported platforms
+        id: platform
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]] && ! grep -q 'app_image ' Casks/happy.rb; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'This version is macOS-only; Linux is not advertised.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: steps.platform.outputs.enabled == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install boot-test dependencies
+        if: steps.platform.outputs.enabled == 'true'
+        run: npm ci --ignore-scripts && npm test
+      - name: Install Linux display and AppImage support
+        if: steps.platform.outputs.enabled == 'true' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libfuse2t64 libnss3 libgtk-3-0t64 libgbm1 libasound2t64
+      - name: Install the checked-out cask with Homebrew
+        if: steps.platform.outputs.enabled == 'true'
+        shell: bash
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
+        run: |
+          brew tap slopus/tap
+          test Casks/happy.rb -ef "$(brew --repository slopus/tap)/Casks/happy.rb"
+          brew style --cask slopus/tap/happy
+          mkdir -p "$RUNNER_TEMP/happy-apps"
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            brew install --cask --appdir="$RUNNER_TEMP/happy-apps" slopus/tap/happy
+            echo "HAPPY_CASK_EXECUTABLE=$RUNNER_TEMP/happy-apps/Happy.app/Contents/MacOS/Happy" >> "$GITHUB_ENV"
+            spctl --assess --type execute --verbose=4 "$RUNNER_TEMP/happy-apps/Happy.app"
+          else
+            brew install --cask --appimagedir="$RUNNER_TEMP/happy-apps" slopus/tap/happy
+            echo "HAPPY_CASK_EXECUTABLE=$RUNNER_TEMP/happy-apps/Happy.AppImage" >> "$GITHUB_ENV"
+          fi
+          brew info --json=v2 --cask slopus/tap/happy > cask-info.json
+          node --input-type=module -e 'import fs from "node:fs"; const c=JSON.parse(fs.readFileSync("cask-info.json")).casks[0]; fs.appendFileSync(process.env.GITHUB_ENV, `HAPPY_CASK_VERSION=${c.version}\n`);'
+      - name: Boot installed app to welcome screen
+        if: steps.platform.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            ELECTRON_DISABLE_SANDBOX=1 xvfb-run --auto-servernum npm run smoke
+          else
+            npm run smoke
+          fi
+      - name: Uninstall without removing user data
+        if: steps.platform.outputs.enabled == 'true' && success()
+        run: brew uninstall --cask slopus/tap/happy
+      - name: Upload launch evidence
+        if: always() && steps.platform.outputs.enabled == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: happy-cask-${{ matrix.runner }}
+          path: artifacts/
+          if-no-files-found: ignore
