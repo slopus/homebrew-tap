@@ -70,4 +70,10 @@ test("versions only move forward; same-version asset replacement is refused", ()
     assertNoDowngrade(current, current.replace('version "1.2.3"', 'version "1.2.2"')),
   );
   assert.throws(() => assertNoDowngrade(current, caskFromRelease(release(true))));
+  assert.throws(() =>
+    assertNoDowngrade(
+      caskFromRelease(release(true)),
+      current.replace('version "1.2.3"', 'version "1.2.4"'),
+    ),
+  );
 });

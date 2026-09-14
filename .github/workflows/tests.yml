@@ -6,11 +6,11 @@ on:
       - main
     paths:
       - Formula/**
-      - .github/workflows/tests.yml
+      - .github/workflows/**
   pull_request:
     paths:
       - Formula/**
-      - .github/workflows/tests.yml
+      - .github/workflows/**
 
 jobs:
   test-bot:

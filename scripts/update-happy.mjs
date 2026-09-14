@@ -71,6 +71,9 @@ ${linux ? "" : "\n  depends_on :macos\n"}end
 }
 
 export function assertNoDowngrade(current, next) {
+  if (current.includes("app_image ") && !next.includes("app_image ")) {
+    throw new Error("Refusing to drop Linux support from a new release.");
+  }
   const previous = current.match(/^  version "(\d+\.\d+\.\d+)"$/m)?.[1];
   const candidate = next.match(/^  version "(\d+\.\d+\.\d+)"$/m)?.[1];
   if (!previous || !candidate) throw new Error("Cannot compare cask versions.");

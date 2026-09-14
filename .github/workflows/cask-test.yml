@@ -79,7 +79,7 @@ jobs:
             echo "HAPPY_CASK_EXECUTABLE=$RUNNER_TEMP/happy-apps/Happy.AppImage" >> "$GITHUB_ENV"
           fi
           brew info --json=v2 --cask slopus/tap/happy > cask-info.json
-          node --input-type=module -e 'import fs from "node:fs"; const c=JSON.parse(fs.readFileSync("cask-info.json")).casks[0]; fs.appendFileSync(process.env.GITHUB_ENV, `HAPPY_CASK_VERSION=${c.version}\n`);'
+          node --input-type=module -e 'import fs from "node:fs"; const c=JSON.parse(fs.readFileSync("cask-info.json")).casks[0]; fs.appendFileSync(process.env.GITHUB_ENV, "HAPPY_CASK_VERSION=" + c.version + "\n");'
       - name: Boot installed app to welcome screen
         if: steps.platform.outputs.enabled == 'true'
         shell: bash
