@@ -17,6 +17,8 @@ delete env.HAPPY_AGENT_SERVER_SOCKET_PATH;
 delete env.HAPPY_AGENT_SERVER_TOKEN_PATH;
 const app = await electron.launch({
   executablePath,
+  // Playwright otherwise injects --no-sandbox, unlike a normal user launch.
+  chromiumSandbox: true,
   args: [`--user-data-dir=${join(profile, "user-data")}`],
   env,
   timeout: 60_000,

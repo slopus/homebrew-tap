@@ -86,7 +86,7 @@ jobs:
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == Linux ]]; then
-            ELECTRON_DISABLE_SANDBOX=1 xvfb-run --auto-servernum npm run smoke
+            xvfb-run --auto-servernum npm run smoke
           else
             npm run smoke
           fi
