@@ -76,7 +76,8 @@ jobs:
             spctl --assess --type execute --verbose=4 "$RUNNER_TEMP/happy-apps/Happy.app"
           else
             brew install --cask --appimagedir="$RUNNER_TEMP/happy-apps" slopus/tap/happy
-            echo "HAPPY_CASK_EXECUTABLE=$RUNNER_TEMP/happy-apps/Happy.AppImage" >> "$GITHUB_ENV"
+            test -x "$RUNNER_TEMP/happy-apps/Happy.AppImage"
+            echo "HAPPY_CASK_EXECUTABLE=$(command -v happy-desktop)" >> "$GITHUB_ENV"
           fi
           brew info --json=v2 --cask slopus/tap/happy > cask-info.json
           node --input-type=module -e 'import fs from "node:fs"; const c=JSON.parse(fs.readFileSync("cask-info.json")).casks[0]; fs.appendFileSync(process.env.GITHUB_ENV, "HAPPY_CASK_VERSION=" + c.version + "\n");'
