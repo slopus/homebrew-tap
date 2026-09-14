@@ -53,6 +53,7 @@ ${
     url "https://github.com/slopus/happy-desktop/releases/download/v#{version}/Happy-#{version}-#{arch}.AppImage"
 
     app_image "Happy-#{version}-#{arch}.AppImage", target: "Happy.AppImage"
+    binary "Happy-#{version}-#{arch}.AppImage", target: "happy-desktop"
   end
 `
     : ""

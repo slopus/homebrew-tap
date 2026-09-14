@@ -10,6 +10,11 @@ Homebrew selects the native Apple Silicon or Intel macOS download. Linux x64
 and arm64 support is enabled when a stable desktop release includes both
 AppImages; a macOS-only version is explicitly marked as such.
 
+On Linux, launch with `happy-desktop` (or `~/Applications/Happy.AppImage`). A
+graphical desktop and AppImage/FUSE support are required; Ubuntu 24.04 x64 and
+arm64 are exercised in CI. On Ubuntu install `libfuse2t64` if AppImage reports
+that `libfuse.so.2` is missing. Homebrew does not make macOS downloads run on Linux.
+
 ```sh
 brew upgrade --cask slopus/tap/happy
 brew uninstall --cask slopus/tap/happy
