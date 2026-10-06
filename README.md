@@ -6,6 +6,11 @@
 brew install --cask slopus/tap/happy
 ```
 
+Then open Happy like any other Mac app: press Cmd+Space, type "Happy", and
+press Return (or run `open -a Happy`). The cask installs no `happy` terminal
+command; if your terminal has one, it is the older Happy CLI (`happy-coder`),
+not the desktop app.
+
 Homebrew selects the native Apple Silicon or Intel macOS download. Linux x64
 and arm64 support is enabled when a stable desktop release includes both
 AppImages; a macOS-only version is explicitly marked as such.

@@ -31,6 +31,13 @@ test("complete release selects both OSes and four checksums", () => {
   assert.match(cask, /app_image/);
   assert.doesNotMatch(cask, /depends_on :macos/);
 });
+test("caveats say how to open the app and that `happy` is the older CLI", () => {
+  const cask = caskFromRelease(release(true));
+  assert.match(cask, /on_macos do[\s\S]*caveats <<~EOS[\s\S]*Spotlight[\s\S]*EOS\n  end/);
+  assert.match(cask, /on_linux do[\s\S]*caveats <<~EOS[\s\S]*`happy-desktop`[\s\S]*EOS\n  end/);
+  assert.equal(cask.match(/older Happy CLI/g).length, 2);
+  assert.match(caskFromRelease(release()), /Spotlight/);
+});
 test("reject previews, drafts, incomplete Linux, duplicates, missing hashes, and foreign URLs", () => {
   for (const mutate of [
     (r) => {

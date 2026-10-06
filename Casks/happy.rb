@@ -13,12 +13,27 @@ cask "happy" do
     auto_updates true
 
     app "Happy.app"
+
+    caveats <<~EOS
+      Happy is a desktop app, not a terminal command. To open it:
+        1. Press Cmd+Space to open Spotlight.
+        2. Type "Happy" and press Return.
+      Happy is installed at #{appdir}/Happy.app; `open -a Happy` also works.
+
+      A `happy` command in your terminal is the older Happy CLI, not this app.
+    EOS
   end
   on_linux do
     url "https://github.com/slopus/happy-desktop/releases/download/v#{version}/Happy-#{version}-#{arch}.AppImage"
 
     app_image "Happy-#{version}-#{arch}.AppImage", target: "Happy.AppImage"
     binary "Happy-#{version}-#{arch}.AppImage", target: "happy-desktop"
+
+    caveats <<~EOS
+      Launch Happy with `happy-desktop`, or open ~/Applications/Happy.AppImage.
+
+      A `happy` command in your terminal is the older Happy CLI, not this app.
+    EOS
   end
 
   name "Happy"
