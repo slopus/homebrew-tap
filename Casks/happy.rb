@@ -1,11 +1,11 @@
 cask "happy" do
   arch arm: "arm64", intel: "x64"
 
-  version "0.0.101"
-  sha256 arm:          "0bb1ce60bb0c51507b4531a02e0c5e0a79c4bbc86d6e462acb8dd79a6588eb2c",
-         intel:        "3bb8e0abdcca30b1bf072c870ee64eb9aa4012bcdfab52c98c8acda85e419c02",
-         arm64_linux:  "b97d55acd2dbb74e981e813e4193fadbd10bda0622a7cd68f651f46434f73807",
-         x86_64_linux: "15c37a99d5d65a78554e1e2ead930f232cfdbf1a2bf69d3cd2af6c6b9a2ec0f3"
+  version "0.0.102"
+  sha256 arm:          "0cc70d0dfb4f4eefc691901df182f459062df3bf3f7b33b3959b9005ae1be3b3",
+         intel:        "05122d27d5f4dc7912b1eb104a2e191f2eb16b227f69e6540bac80a32e7fd158",
+         arm64_linux:  "8570d9853772027eb17afcbf1e37edcd5f08a6e3c84127b29b0b6f7a94f11b7a",
+         x86_64_linux: "c3d606434ccffe64c64a68d005d8799c5c47bd35aba3a894e0baedaa28a7907f"
 
   on_macos do
     url "https://github.com/slopus/happy-desktop/releases/download/v#{version}/Happy-#{version}-#{arch}.dmg"
