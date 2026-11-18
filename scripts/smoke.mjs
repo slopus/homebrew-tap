@@ -101,6 +101,7 @@ async function main() {
   delete env.HAPPY_AGENT_SERVER_SOCKET_PATH;
   delete env.HAPPY_AGENT_SERVER_TOKEN_PATH;
   delete env.ELECTRON_RUN_AS_NODE;
+  delete env.ELECTRON_DISABLE_SANDBOX;
   delete env.NODE_OPTIONS;
   let archive;
   if (process.platform === "darwin") {
