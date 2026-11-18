@@ -3,9 +3,9 @@ name: Install and boot Happy cask
 on:
   push:
     branches: [main]
-    paths: [Casks/**, scripts/**, package*.json, .github/workflows/cask-test.yml]
+    paths: [Casks/**, scripts/**, package*.json, .github/workflows/cask-test.yml, .github/workflows/update-happy.yml, .github/workflows/validate-update.yml]
   pull_request:
-    paths: [Casks/**, scripts/**, package*.json, .github/workflows/cask-test.yml]
+    paths: [Casks/**, scripts/**, package*.json, .github/workflows/cask-test.yml, .github/workflows/update-happy.yml, .github/workflows/validate-update.yml]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -70,21 +70,30 @@ jobs:
           test Casks/happy.rb -ef "$(brew --repository slopus/tap)/Casks/happy.rb"
           brew style --cask slopus/tap/happy
           mkdir -p "$RUNNER_TEMP/happy-apps"
+          mkdir -p artifacts
           if [[ "$RUNNER_OS" == macOS ]]; then
             brew install --cask --appdir="$RUNNER_TEMP/happy-apps" slopus/tap/happy
             echo "HAPPY_CASK_EXECUTABLE=$RUNNER_TEMP/happy-apps/Happy.app/Contents/MacOS/Happy" >> "$GITHUB_ENV"
-            spctl --assess --type execute --verbose=4 "$RUNNER_TEMP/happy-apps/Happy.app"
+            codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/happy-apps/Happy.app" 2>&1 | tee artifacts/codesign.log
+            spctl --assess --type execute --verbose=4 "$RUNNER_TEMP/happy-apps/Happy.app" 2>&1 | tee artifacts/gatekeeper.log
           else
             brew install --cask --appimagedir="$RUNNER_TEMP/happy-apps" slopus/tap/happy
             test -x "$RUNNER_TEMP/happy-apps/Happy.AppImage"
             echo "HAPPY_CASK_EXECUTABLE=$(command -v happy-desktop)" >> "$GITHUB_ENV"
           fi
-          brew info --json=v2 --cask slopus/tap/happy > cask-info.json
-          node --input-type=module -e 'import fs from "node:fs"; const c=JSON.parse(fs.readFileSync("cask-info.json")).casks[0]; fs.appendFileSync(process.env.GITHUB_ENV, "HAPPY_CASK_VERSION=" + c.version + "\n");'
-      - name: Boot installed app to welcome screen
+          brew info --json=v2 --cask slopus/tap/happy > artifacts/cask-info.json
+          cp Casks/happy.rb artifacts/tested-cask.rb
+          node --input-type=module -e 'import fs from "node:fs"; const c=JSON.parse(fs.readFileSync("artifacts/cask-info.json")).casks[0]; fs.appendFileSync(process.env.GITHUB_ENV, "HAPPY_CASK_VERSION=" + c.version + "\n");'
+      - name: Verify installed app and capture hidden welcome screen
         if: steps.platform.outputs.enabled == 'true'
         shell: bash
+        env:
+          # Never enabled in the reusable candidate publication gate.
+          HAPPY_CASK_LEGACY_BASELINE: ${{ !inputs.candidate && '1' || '0' }}
         run: |
+          if [[ "$HAPPY_CASK_VERSION" == 0.0.102 && "$HAPPY_CASK_LEGACY_BASELINE" == 1 ]]; then
+            echo 'Legacy 0.0.102 install/identity baseline only: this pin predates packaged smoke reports. Latest candidate jobs require full launch checks before publication.' >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [[ "$RUNNER_OS" == Linux ]]; then
             xvfb-run --auto-servernum npm run smoke
           else
@@ -99,4 +108,5 @@ jobs:
         with:
           name: happy-cask-${{ matrix.runner }}
           path: artifacts/
-          if-no-files-found: ignore
+          if-no-files-found: error
+          retention-days: 30

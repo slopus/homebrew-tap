@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertNoDowngrade, caskFromRelease } from "./update-happy.mjs";
+import { assertNoDowngrade, assertTestedCandidate, caskFromRelease } from "./update-happy.mjs";
 
 function release(linux = false) {
   return {
@@ -83,4 +83,12 @@ test("versions only move forward; same-version asset replacement is refused", ()
       current.replace('version "1.2.3"', 'version "1.2.4"'),
     ),
   );
+});
+test("publish refuses a superseded stable or replaced asset after testing", () => {
+  const input = release(true);
+  const tested = caskFromRelease(input);
+  assert.doesNotThrow(() => assertTestedCandidate(tested, tested));
+  input.assets[0].digest = `sha256:${"b".repeat(64)}`;
+  assert.throws(() => assertTestedCandidate(tested, caskFromRelease(input)), /no longer matches/);
+  assert.throws(() => assertTestedCandidate(tested, tested.replaceAll("1.2.3", "1.2.4")), /no longer matches/);
 });

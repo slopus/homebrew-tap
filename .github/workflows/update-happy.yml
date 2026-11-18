@@ -14,15 +14,20 @@ concurrency:
 
 jobs:
   prepare:
+    # A branch dispatch can validate in validate-update.yml, never publish.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       changed: ${{ steps.generate.outputs.changed }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
-      - run: node --test scripts/*.test.mjs
+      - run: node --test scripts/update-happy.test.mjs
       - name: Generate candidate from upstream stable release
         id: generate
         env:
@@ -31,6 +36,7 @@ jobs:
           node scripts/update-happy.mjs
           if git diff --quiet -- Casks/happy.rb; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'The published cask already matches GitHub Latest; no update needed.' >> "$GITHUB_STEP_SUMMARY"
           else
             echo 'changed=true' >> "$GITHUB_OUTPUT"
           fi
@@ -49,14 +55,28 @@ jobs:
   publish:
     needs: [prepare, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: candidate-cask
           path: Casks
+      - name: Recheck Latest and unchanged tap before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA" || {
+            echo '::error::Tap main changed during testing. Run the updater again.'
+            exit 1
+          }
+          node scripts/update-happy.mjs --check
       - name: Commit only the tested candidate
         run: |
           git config user.name 'github-actions[bot]'
@@ -65,3 +85,23 @@ jobs:
           git commit -m "happy: update to tested stable release"
           git push origin HEAD:main
           echo 'Published the cask after install, boot, and uninstall checks passed.' >> "$GITHUB_STEP_SUMMARY"
+  report:
+    needs: [prepare, test, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report delivery status and retry instructions
+        env:
+          PREPARE: ${{ needs.prepare.result }}
+          TEST: ${{ needs.test.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          CHANGED: ${{ needs.prepare.outputs.changed }}
+        run: |
+          echo "Stable cask delivery: prepare=$PREPARE, install/boot/uninstall=$TEST, publish=$PUBLISH." >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$PREPARE" == success && "$CHANGED" == false ]]; then
+            echo 'Already current. No publication required.' >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$PUBLISH" != success ]]; then
+            echo '::error::Stable cask delivery did not publish. Inspect the failed jobs and launch evidence, then run Update Happy from stable release on main again. The hourly schedule also retries using GitHub Latest.'
+            echo 'Delivery failed. Inspect failed jobs and happy-cask-* artifacts, then rerun the workflow on main. Hourly scheduled runs also retry. No smoke, signature, checksum, or downgrade gate is bypassed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

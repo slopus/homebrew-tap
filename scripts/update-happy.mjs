@@ -1,4 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { setTimeout } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 
 const repository = "slopus/happy-desktop";
@@ -103,22 +104,51 @@ export function assertNoDowngrade(current, next) {
     throw new Error(`Release ${previous} changed without a version bump.`);
 }
 
-async function main() {
-  const headers = { Accept: "application/vnd.github+json" };
+export function assertTestedCandidate(candidate, latest) {
+  if (candidate.trimEnd() !== latest.trimEnd())
+    throw new Error("The tested candidate no longer matches GitHub Latest. Run the updater again to test the current stable release.");
+}
+
+async function latestRelease() {
+  const headers = { Accept: "application/vnd.github+json", "Cache-Control": "no-cache" };
   if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
-  const response = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, {
-    headers,
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`GitHub release lookup failed: ${response.status}.`);
-  const cask = caskFromRelease(await response.json());
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, {
+        headers,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (response.ok) return await response.json();
+      if (response.status !== 429 && response.status < 500)
+        throw Object.assign(new Error(`GitHub release lookup failed: ${response.status}.`), { permanent: true });
+      throw new Error(`GitHub release lookup failed: ${response.status}.`);
+    } catch (error) {
+      if (error.permanent || attempt === 2) throw error;
+      console.warn(`Stable release lookup failed; retrying (${attempt + 1}/2).`);
+      await setTimeout(1000 * 2 ** attempt);
+    }
+  }
+}
+
+async function main() {
+  if (process.argv.slice(2).some((argument) => argument !== "--check"))
+    throw new Error("Usage: node scripts/update-happy.mjs [--check]");
+  const release = await latestRelease();
+  const cask = caskFromRelease(release);
   const path = new URL("../Casks/happy.rb", import.meta.url);
   const current = await readFile(path, "utf8").catch((error) => {
     if (error.code === "ENOENT") return undefined;
     throw error;
   });
-  if (current !== undefined) assertNoDowngrade(current, cask);
-  await writeFile(path, cask);
+  if (process.argv.includes("--check")) {
+    if (current === undefined) throw new Error("Missing tested candidate.");
+    assertTestedCandidate(current, cask);
+  } else {
+    if (current !== undefined) assertNoDowngrade(current, cask);
+    await writeFile(path, cask);
+  }
+  if (process.env.GITHUB_STEP_SUMMARY)
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, `GitHub Latest: [${release.tag_name}](https://github.com/${repository}/releases/tag/${release.tag_name}). ${process.argv.includes("--check") ? "The tested cask still matches all stable asset checksums." : "Candidate generated with upstream SHA-256 checksums."}\n`);
   console.log(cask.match(/^  version .+$/m)[0].trim());
 }
 
